@@ -22,19 +22,23 @@ A robust Bash script for converting WAV audio files to FLAC format with metadata
 
 1. Download the script: 
 
-wget https://raw.githubusercontent.com/yourusername/wav-to-flac/main/wav-to-flac.sh
+    ```
+    wget https://raw.githubusercontent.com/yourusername/wav-to-flac/main/wav-to-flac.sh
+    ```
 
 2. Make the script executable:
 
+```
 chmod +x wav-to-flac.sh
-
+```
 
 ## Usage
 
 Basic usage:
 
+```
 wav-to-flac.sh [options] [directory]
-
+```
 
 If no directory is specified, the current directory is used.
 
@@ -46,18 +50,21 @@ If no directory is specified, the current directory is used.
 
 1. Convert all WAV files in the current directory (dry run mode, no actual files moved):
 
+```
 ./wav-to-flac.sh
-
+```
 
 2. Convert all WAV files in a specific directory (dry run mode):
 
+```
 ./wav-to-flac.sh "/path/to/music/folder"
-
+```
 
 3. Convert files and move original WAV files to trash if FLAC is smaller:
 
+```
 ./wav-to-flac.sh -n "/path/to/music/folder"
-
+```
 
 ## File Naming
 
