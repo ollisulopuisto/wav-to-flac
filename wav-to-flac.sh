@@ -15,7 +15,6 @@
 # ------------------------------------------------------------------------------
 
 # --- Configuration Variables ---
-base_dir="$2"
 log_file="${base_dir}/wav2flac_log.txt"
 parallel_processes=4
 dry_run=1
@@ -99,6 +98,9 @@ while getopts ":n" opt; do
   esac
 done
 shift $((OPTIND-1))
+
+# Set base_dir *after* processing options
+base_dir="$1"
 
 # Validate inputs and requirements
 if [ -z "$base_dir" ]; then
