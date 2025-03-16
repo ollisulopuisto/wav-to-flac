@@ -18,20 +18,6 @@ A robust Bash script for converting WAV audio files to FLAC format with metadata
 - ffmpeg (must be installed and available in PATH)
 - Linux, macOS, or Synology DSM 7+
 
-## Installation
-
-1. Download the script: 
-
-```
-wget https://raw.githubusercontent.com/yourusername/wav-to-flac/main/wav-to-flac.sh
-```
-
-2. Make the script executable:
-
-```
-chmod +x wav-to-flac.sh
-```
-
 ## Usage
 
 Basic usage:
