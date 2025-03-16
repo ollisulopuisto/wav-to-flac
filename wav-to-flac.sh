@@ -34,11 +34,22 @@ convert_wav_to_flac() {
     # Check if output file already exists
     if [[ -f "$flac_file" ]]; then
         log "FLAC file already exists: $flac_file - skipping conversion"
+    elif [[ $DRY_RUN -eq 1 ]]; then
+        # In dry run mode, just simulate the conversion
+        log "DRY RUN: Would convert $wav_file to $flac_file"
+        
+        # Estimate size (typically FLAC is ~50-60% of WAV size)
+        local wav_size=$(stat -c "%s" "$wav_file" 2>/dev/null || stat -f "%z" "$wav_file")
+        local estimated_flac_size=$((wav_size * 6 / 10))
+        local saved_mb=$(( (wav_size - estimated_flac_size) / 1024 / 1024 ))
+        
+        log "DRY RUN: WAV file would likely be larger than FLAC (estimated saving ~${saved_mb}MB)"
+        log "DRY RUN: Would move $wav_file to trash"
     else
         # Save original file timestamps
         local mod_time=$(stat -c "%Y" "$wav_file" 2>/dev/null || stat -f "%m" "$wav_file")
         
-        # Perform the conversion using ffmpeg with metadata preservation
+        # Perform the actual conversion using ffmpeg with metadata preservation
         ffmpeg -y -hide_banner -loglevel error -nostdin -i "$wav_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>> "$LOG_FILE"
         
         if [[ $? -ne 0 ]]; then
@@ -63,17 +74,15 @@ convert_wav_to_flac() {
         fi
         
         log "Conversion successful: $wav_file -> $flac_file (with metadata preserved)"
-    fi
-    
-    # Compare sizes
-    local wav_size=$(stat -c "%s" "$wav_file" 2>/dev/null || stat -f "%z" "$wav_file")
-    local flac_size=$(stat -c "%s" "$flac_file" 2>/dev/null || stat -f "%z" "$flac_file")
-    
-    if (( wav_size > flac_size )); then
-        local saved_mb=$(( (wav_size - flac_size) / 1024 / 1024 ))
-        log "WAV file is larger than FLAC (saving ~${saved_mb}MB)"
         
-        if [[ $DRY_RUN -eq 0 ]]; then
+        # Compare sizes and handle trash moving only in real run mode
+        local wav_size=$(stat -c "%s" "$wav_file" 2>/dev/null || stat -f "%z" "$wav_file")
+        local flac_size=$(stat -c "%s" "$flac_file" 2>/dev/null || stat -f "%z" "$flac_file")
+        
+        if (( wav_size > flac_size )); then
+            local saved_mb=$(( (wav_size - flac_size) / 1024 / 1024 ))
+            log "WAV file is larger than FLAC (saving ~${saved_mb}MB)"
+            
             # Find trash directory - start with parent directories
             local trash_dir=""
             local dir=$(dirname "$wav_file")
@@ -109,10 +118,8 @@ convert_wav_to_flac() {
                 fi
             fi
         else
-            log "DRY RUN: Would move $wav_file to trash"
+            log "WAV file is smaller or equal to FLAC - keeping both files"
         fi
-    else
-        log "WAV file is smaller or equal to FLAC - keeping both files"
     fi
 }
 
