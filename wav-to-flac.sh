@@ -132,7 +132,6 @@ touch "$log_file"
 
 # Export variables and functions to make them available to subprocesses
 export log_file
-export dry_run
 export -f log
 export -f get_volume_path
 export -f convert_wav_to_flac
