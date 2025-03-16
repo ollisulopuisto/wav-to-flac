@@ -139,7 +139,8 @@ export -f convert_wav_to_flac
 
 log "Starting WAV to FLAC conversion script."
 
-find "$base_dir" -type f -iname "*.wav" -print0 | xargs -0 -P "$parallel_processes" bash -c 'convert_wav_to_flac "$1"' _
+# Pass dry_run explicitly to the bash command
+find "$base_dir" -type f -iname "*.wav" -print0 | xargs -0 -P "$parallel_processes" bash -c 'dry_run="$2"; convert_wav_to_flac "$1"' _ {} "$dry_run"
 
 log "Conversion process completed."
 exit 0
