@@ -36,8 +36,7 @@ convert_wav_to_flac() {
         log "FLAC file already exists: $flac_file - skipping conversion"
     else
         # Save original file timestamps
-        local mod_time=$(stat -c "%y" "$wav_file" 2>/dev/null || stat -f "%m" "$wav_file")
-        local access_time=$(stat -c "%x" "$wav_file" 2>/dev/null || stat -f "%a" "$wav_file")
+        local mod_time=$(stat -c "%Y" "$wav_file" 2>/dev/null || stat -f "%m" "$wav_file")
         
         # Perform the conversion using ffmpeg with metadata preservation
         ffmpeg -y -hide_banner -loglevel error -nostdin -i "$wav_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>> "$LOG_FILE"
@@ -52,8 +51,15 @@ convert_wav_to_flac() {
             # macOS
             touch -t "$(date -r "$mod_time" "+%Y%m%d%H%M.%S")" "$flac_file"
         else
-            # Linux
-            touch -d "@$mod_time" "$flac_file"
+            # Linux/Synology - try different methods
+            if [[ "$mod_time" =~ ^[0-9]+$ ]]; then
+                # If mod_time is only digits (Unix timestamp)
+                touch -d "@$mod_time" "$flac_file" 2>/dev/null
+            else
+                # If mod_time is a formatted date string
+                touch -d "$mod_time" "$flac_file" 2>/dev/null || 
+                touch "$flac_file" 2>/dev/null
+            fi
         fi
         
         log "Conversion successful: $wav_file -> $flac_file (with metadata preserved)"
