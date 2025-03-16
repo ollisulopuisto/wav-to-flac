@@ -1,15 +1,15 @@
 # WAV to FLAC Converter
 
-A robust Bash script for converting WAV audio files to FLAC format with metadata preservation, optimized for Synology NAS systems but works on Linux and macOS too.
+A robust Bash script for converting WAV and AIFF audio files to FLAC format with metadata preservation, optimized for Synology NAS systems but works on Linux and macOS too.
 
 ## Features
 
-- Converts WAV files to FLAC format using ffmpeg
+- Converts WAV and AIFF files to FLAC format using ffmpeg (case insensitive)
 - Preserves file metadata and timestamps during conversion
-- Compares file sizes between WAV and FLAC formats
-- Optionally moves WAV files to trash if FLAC is smaller (saves disk space)
+- Compares file sizes between original audio and FLAC formats
+- Optionally moves original audio files to trash if FLAC is smaller (saves disk space)
 - Includes detailed logging for tracking conversions
-- Dry run mode to simulate conversion without changing files (no files are created or moved)
+- Dry run mode to simulate conversion without changing files
 - Safely traverses directories with spaces in filenames
 
 ## Requirements
@@ -70,8 +70,9 @@ If no directory is specified, the current directory is used.
 
 The script maintains the original filename and adds a `.flac` extension:
 
-- Original: `file.wav`
-- Converted: `file.wav.flac`
+Original: file.wav → Converted: file.wav.flac
+Original: file.aiff → Converted: file.aiff.flac
+Original: file.AIF → Converted: file.AIF.flac
 
 This preserves the original file name completely.
 

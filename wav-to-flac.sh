@@ -24,13 +24,14 @@ log() {
     echo "$message" | tee -a "$LOG_FILE"
 }
 
-# --- Convert WAV to FLAC ---
-convert_wav_to_flac() {
-    local wav_file="$1"
-    local flac_file="${wav_file}.flac"
+# --- Convert Audio (WAV/AIFF) to FLAC ---
+convert_audio_to_flac() {
+    local audio_file="$1"
+    local flac_file="${audio_file}.flac"
     local delete_flac=0
+    local format=$(echo "$audio_file" | grep -i -E '\.(wav|aif|aiff)$' | tr '[:upper:]' '[:lower:]')
     
-    log "Processing: $wav_file"
+    log "Processing: $audio_file"
     
     # Check if output file already exists
     if [[ -f "$flac_file" ]]; then
@@ -42,13 +43,13 @@ convert_wav_to_flac() {
         fi
         
         # Save original file timestamps
-        local mod_time=$(stat -c "%Y" "$wav_file" 2>/dev/null || stat -f "%m" "$wav_file")
+        local mod_time=$(stat -c "%Y" "$audio_file" 2>/dev/null || stat -f "%m" "$audio_file")
         
         # Perform the actual conversion using ffmpeg with metadata preservation
-        ffmpeg -y -hide_banner -loglevel error -nostdin -i "$wav_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>> "$LOG_FILE"
+        ffmpeg -y -hide_banner -loglevel error -nostdin -i "$audio_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>> "$LOG_FILE"
         
         if [[ $? -ne 0 ]]; then
-            log "ERROR: ffmpeg conversion failed for: $wav_file"
+            log "ERROR: ffmpeg conversion failed for: $audio_file"
             return 1
         fi
         
@@ -68,25 +69,25 @@ convert_wav_to_flac() {
             fi
         fi
         
-        log "Conversion successful: $wav_file -> $flac_file (with metadata preserved)"
+        log "Conversion successful: $audio_file -> $flac_file (with metadata preserved)"
     fi
     
     # Always compare sizes if FLAC file exists
     if [[ -f "$flac_file" ]]; then
-        local wav_size=$(stat -c "%s" "$wav_file" 2>/dev/null || stat -f "%z" "$wav_file")
+        local audio_size=$(stat -c "%s" "$audio_file" 2>/dev/null || stat -f "%z" "$audio_file")
         local flac_size=$(stat -c "%s" "$flac_file" 2>/dev/null || stat -f "%z" "$flac_file")
         
-        if (( wav_size > flac_size )); then
-            local saved_mb=$(( (wav_size - flac_size) / 1024 / 1024 ))
-            log "WAV file is larger than FLAC (saving ~${saved_mb}MB)"
+        if (( audio_size > flac_size )); then
+            local saved_mb=$(( (audio_size - flac_size) / 1024 / 1024 ))
+            log "Audio file is larger than FLAC (saving ~${saved_mb}MB)"
             
             # Only move to trash in real run mode
             if [[ $DRY_RUN -eq 1 ]]; then
-                log "DRY RUN: Would move $wav_file to trash"
+                log "DRY RUN: Would move $audio_file to trash"
             else
                 # Find trash directory - start with parent directories
                 local trash_dir=""
-                local dir=$(dirname "$wav_file")
+                local dir=$(dirname "$audio_file")
                 
                 # Search up the directory tree for #recycle
                 while [[ "$dir" != "/" && -z "$trash_dir" ]]; do
@@ -107,20 +108,20 @@ convert_wav_to_flac() {
                 fi
                 
                 if [[ -z "$trash_dir" ]]; then
-                    log "ERROR: Trash directory not found for: $wav_file"
+                    log "ERROR: Trash directory not found for: $audio_file"
                 else
-                    log "Moving WAV to trash: $wav_file -> $trash_dir/"
-                    mv "$wav_file" "$trash_dir/" 2>> "$LOG_FILE"
+                    log "Moving audio to trash: $audio_file -> $trash_dir/"
+                    mv "$audio_file" "$trash_dir/" 2>> "$LOG_FILE"
                     
                     if [[ $? -ne 0 ]]; then
-                        log "ERROR: Could not move $wav_file to trash"
+                        log "ERROR: Could not move $audio_file to trash"
                     else
-                        log "Successfully moved to trash: $wav_file"
+                        log "Successfully moved to trash: $audio_file"
                     fi
                 fi
             fi
         else
-            log "WAV file is smaller or equal to FLAC - keeping both files"
+            log "Audio file is smaller or equal to FLAC - keeping both files"
         fi
         
         # In dry run mode, delete the FLAC file we just created
@@ -168,18 +169,18 @@ main() {
     log "========================================"
     
     # Use find with exec to process files - more reliable with spaces in filenames
-    log "Finding WAV files to process..."
-    local total_files=$(find "$base_dir" -type f -iname "*.wav" | wc -l)
-    log "Found $total_files WAV files to process"
+    log "Finding WAV and AIFF files to process..."
+    local total_files=$(find "$base_dir" \( -iname "*.wav" -o -iname "*.aif" -o -iname "*.aiff" \) | wc -l)
+    log "Found $total_files audio files to process"
     
     if [ "$total_files" -gt 0 ]; then
         # Process files one by one using find's -exec
         local count=0
-        find "$base_dir" -type f -iname "*.wav" -print0 | 
-        while IFS= read -r -d $'\0' wav_file; do
+        find "$base_dir" \( -iname "*.wav" -o -iname "*.aif" -o -iname "*.aiff" \) -print0 | 
+        while IFS= read -r -d $'\0' audio_file; do
             ((count++))
             log "[$count/$total_files] Processing file"
-            convert_wav_to_flac "$wav_file"
+            convert_audio_to_flac "$audio_file"
         done
     else
         log "No WAV files found to process."
