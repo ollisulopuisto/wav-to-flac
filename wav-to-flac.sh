@@ -110,14 +110,7 @@ convert_audio_to_flac() {
                 if [[ -z "$trash_dir" ]]; then
                     log "ERROR: Trash directory not found for: $audio_file"
                 else
-                    log "Moving audio to trash: $audio_file -> $trash_dir/"
-                    mv "$audio_file" "$trash_dir/" 2>> "$LOG_FILE"
-                    
-                    if [[ $? -ne 0 ]]; then
-                        log "ERROR: Could not move $audio_file to trash"
-                    else
-                        log "Successfully moved to trash: $audio_file"
-                    fi
+                    move_to_trash "$audio_file" "$base_dir" "$trash_dir"
                 fi
             fi
         else
@@ -134,6 +127,43 @@ convert_audio_to_flac() {
                 log "Successfully removed temporary FLAC file"
             fi
         fi
+    fi
+}
+
+# --- Move file to trash while preserving directory structure ---
+move_to_trash() {
+    local file_path="$1"
+    local base_dir="$2"
+    local trash_dir="$3"
+    
+    # Get the relative path from base_dir to file_path
+    local rel_path=$(realpath --relative-to="$base_dir" "$file_path" 2>/dev/null || 
+                    echo "${file_path#$base_dir/}")
+    
+    # Create target directory in trash
+    local target_dir="$trash_dir/$(dirname "$rel_path")"
+    
+    # Create directory structure if it doesn't exist
+    if [[ ! -d "$target_dir" ]]; then
+        log "Creating directory structure in trash: $target_dir"
+        mkdir -p "$target_dir" 2>/dev/null
+        
+        if [[ $? -ne 0 ]]; then
+            log "ERROR: Could not create directory structure in trash"
+            return 1
+        fi
+    fi
+    
+    # Move the file to the structured trash location
+    log "Moving audio to trash: $file_path -> $target_dir/"
+    mv "$file_path" "$target_dir/" 2>> "$LOG_FILE"
+    
+    if [[ $? -ne 0 ]]; then
+        log "ERROR: Could not move $file_path to trash"
+        return 1
+    else
+        log "Successfully moved to trash: $file_path"
+        return 0
     fi
 }
 
