@@ -40,7 +40,7 @@ convert_wav_to_flac() {
         local access_time=$(stat -c "%x" "$wav_file" 2>/dev/null || stat -f "%a" "$wav_file")
         
         # Perform the conversion using ffmpeg with metadata preservation
-        ffmpeg -y -hide_banner -loglevel error -i "$wav_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>> "$LOG_FILE"
+        ffmpeg -y -hide_banner -loglevel error -nostdin -i "$wav_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>> "$LOG_FILE"
         
         if [[ $? -ne 0 ]]; then
             log "ERROR: ffmpeg conversion failed for: $wav_file"
