@@ -130,19 +130,14 @@ fi
 log_file="$HOME/wav2flac_log.txt"
 touch "$log_file"
 
-# Export log_file variable
+# Export variables and functions to make them available to subprocesses
 export log_file
-
-# Export the logging function
+export dry_run
 export -f log
-
-# Export the get_volume_path function
 export -f get_volume_path
+export -f convert_wav_to_flac
 
 log "Starting WAV to FLAC conversion script."
-
-# Export the convert_wav_to_flac function
-export -f convert_wav_to_flac
 
 find "$base_dir" -type f -iname "*.wav" -print0 | xargs -0 -P "$parallel_processes" bash -c 'convert_wav_to_flac "$1"' _
 
