@@ -15,7 +15,6 @@
 # ------------------------------------------------------------------------------
 
 # --- Configuration Variables ---
-log_file="${base_dir}/wav2flac_log.txt"
 parallel_processes=4
 dry_run=1
 
@@ -23,8 +22,17 @@ dry_run=1
 # Get volume path from a given file
 get_volume_path() {
   local file="$1"
-  # Extract the volume part (e.g., /volume1)
-  echo "$file" | cut -d'/' -f1,2
+  local dir=$(dirname "$file")
+
+  while [ "$dir" != "/" ]; do
+    if [ -d "$dir/#recycle" ]; then
+      echo "$dir"
+      return
+    fi
+    dir=$(dirname "$dir")
+  done
+
+  echo "/volume2" # Default volume path if #recycle not found in parent directories
 }
 
 # --- Logging Function ---
@@ -59,7 +67,7 @@ convert_wav_to_flac() {
     if [[ "$dry_run" -eq 0 ]]; then
       # Dynamically determine trash directory
       local volume_path=$(get_volume_path "$wav_file")
-      local trash_dir="${volume_path}/@recycle"
+      local trash_dir="${volume_path}/#recycle"
 
       if [ ! -d "$trash_dir" ]; then
         log "ERROR: Trash directory not found: $trash_dir"
@@ -118,11 +126,25 @@ if [ ! -d "$base_dir" ]; then
   exit 1
 fi
 
+# Create log file in the user's home directory
+log_file="$HOME/wav2flac_log.txt"
 touch "$log_file"
+
+# Export log_file variable
+export log_file
+
+# Export the logging function
+export -f log
+
+# Export the get_volume_path function
+export -f get_volume_path
 
 log "Starting WAV to FLAC conversion script."
 
-find "$base_dir" -type f -iname "*.wav" -print0 | xargs -0 -P "$parallel_processes" convert_wav_to_flac
+# Export the convert_wav_to_flac function
+export -f convert_wav_to_flac
+
+find "$base_dir" -type f -iname "*.wav" -print0 | xargs -0 -P "$parallel_processes" bash -c 'convert_wav_to_flac "$1"' _
 
 log "Conversion process completed."
 exit 0
