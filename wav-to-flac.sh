@@ -28,24 +28,19 @@ log() {
 convert_wav_to_flac() {
     local wav_file="$1"
     local flac_file="${wav_file}.flac"
+    local delete_flac=0
     
     log "Processing: $wav_file"
     
     # Check if output file already exists
     if [[ -f "$flac_file" ]]; then
         log "FLAC file already exists: $flac_file - skipping conversion"
-    elif [[ $DRY_RUN -eq 1 ]]; then
-        # In dry run mode, just simulate the conversion
-        log "DRY RUN: Would convert $wav_file to $flac_file"
-        
-        # Estimate size (typically FLAC is ~50-60% of WAV size)
-        local wav_size=$(stat -c "%s" "$wav_file" 2>/dev/null || stat -f "%z" "$wav_file")
-        local estimated_flac_size=$((wav_size * 6 / 10))
-        local saved_mb=$(( (wav_size - estimated_flac_size) / 1024 / 1024 ))
-        
-        log "DRY RUN: WAV file would likely be larger than FLAC (estimated saving ~${saved_mb}MB)"
-        log "DRY RUN: Would move $wav_file to trash"
     else
+        # Remember to delete FLAC if in dry run mode
+        if [[ $DRY_RUN -eq 1 ]]; then
+            delete_flac=1
+        fi
+        
         # Save original file timestamps
         local mod_time=$(stat -c "%Y" "$wav_file" 2>/dev/null || stat -f "%m" "$wav_file")
         
@@ -74,8 +69,10 @@ convert_wav_to_flac() {
         fi
         
         log "Conversion successful: $wav_file -> $flac_file (with metadata preserved)"
-        
-        # Compare sizes and handle trash moving only in real run mode
+    fi
+    
+    # Always compare sizes if FLAC file exists
+    if [[ -f "$flac_file" ]]; then
         local wav_size=$(stat -c "%s" "$wav_file" 2>/dev/null || stat -f "%z" "$wav_file")
         local flac_size=$(stat -c "%s" "$flac_file" 2>/dev/null || stat -f "%z" "$flac_file")
         
@@ -83,42 +80,58 @@ convert_wav_to_flac() {
             local saved_mb=$(( (wav_size - flac_size) / 1024 / 1024 ))
             log "WAV file is larger than FLAC (saving ~${saved_mb}MB)"
             
-            # Find trash directory - start with parent directories
-            local trash_dir=""
-            local dir=$(dirname "$wav_file")
-            
-            # Search up the directory tree for #recycle
-            while [[ "$dir" != "/" && -z "$trash_dir" ]]; do
-                if [[ -d "$dir/#recycle" ]]; then
-                    trash_dir="$dir/#recycle"
-                fi
-                dir=$(dirname "$dir")
-            done
-            
-            # If not found, check volume roots
-            if [[ -z "$trash_dir" ]]; then
-                for vol in "/volume1" "/volume2" "/volume1/backup" "/volume2/backup"; do
-                    if [[ -d "$vol/#recycle" ]]; then
-                        trash_dir="$vol/#recycle"
-                        break
-                    fi
-                done
-            fi
-            
-            if [[ -z "$trash_dir" ]]; then
-                log "ERROR: Trash directory not found for: $wav_file"
+            # Only move to trash in real run mode
+            if [[ $DRY_RUN -eq 1 ]]; then
+                log "DRY RUN: Would move $wav_file to trash"
             else
-                log "Moving WAV to trash: $wav_file -> $trash_dir/"
-                mv "$wav_file" "$trash_dir/" 2>> "$LOG_FILE"
+                # Find trash directory - start with parent directories
+                local trash_dir=""
+                local dir=$(dirname "$wav_file")
                 
-                if [[ $? -ne 0 ]]; then
-                    log "ERROR: Could not move $wav_file to trash"
+                # Search up the directory tree for #recycle
+                while [[ "$dir" != "/" && -z "$trash_dir" ]]; do
+                    if [[ -d "$dir/#recycle" ]]; then
+                        trash_dir="$dir/#recycle"
+                    fi
+                    dir=$(dirname "$dir")
+                done
+                
+                # If not found, check volume roots
+                if [[ -z "$trash_dir" ]]; then
+                    for vol in "/volume1" "/volume2" "/volume1/backup" "/volume2/backup"; do
+                        if [[ -d "$vol/#recycle" ]]; then
+                            trash_dir="$vol/#recycle"
+                            break
+                        fi
+                    done
+                fi
+                
+                if [[ -z "$trash_dir" ]]; then
+                    log "ERROR: Trash directory not found for: $wav_file"
                 else
-                    log "Successfully moved to trash: $wav_file"
+                    log "Moving WAV to trash: $wav_file -> $trash_dir/"
+                    mv "$wav_file" "$trash_dir/" 2>> "$LOG_FILE"
+                    
+                    if [[ $? -ne 0 ]]; then
+                        log "ERROR: Could not move $wav_file to trash"
+                    else
+                        log "Successfully moved to trash: $wav_file"
+                    fi
                 fi
             fi
         else
             log "WAV file is smaller or equal to FLAC - keeping both files"
+        fi
+        
+        # In dry run mode, delete the FLAC file we just created
+        if [[ $delete_flac -eq 1 ]]; then
+            log "DRY RUN: Removing temporary FLAC file"
+            rm "$flac_file"
+            if [[ $? -ne 0 ]]; then
+                log "WARNING: Could not remove temporary FLAC file: $flac_file"
+            else
+                log "Successfully removed temporary FLAC file"
+            fi
         fi
     fi
 }
