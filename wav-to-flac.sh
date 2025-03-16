@@ -37,7 +37,7 @@ log() {
 # --- Core Conversion Function ---
 convert_wav_to_flac() {
   local wav_file="$1"
-  local flac_file="${wav_file%.wav}.flac"
+  local flac_file="${wav_file}.flac"
 
   log "Processing: $wav_file"
 
