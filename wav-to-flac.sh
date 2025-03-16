@@ -46,10 +46,12 @@ convert_audio_to_flac() {
         local mod_time=$(stat -c "%Y" "$audio_file" 2>/dev/null || stat -f "%m" "$audio_file")
         
         # Perform the actual conversion using ffmpeg with metadata preservation
-        ffmpeg -y -hide_banner -loglevel error -nostdin -i "$audio_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>> "$LOG_FILE"
-        
-        if [[ $? -ne 0 ]]; then
+        ffmpeg_output=$(ffmpeg -y -hide_banner -loglevel error -nostdin -i "$audio_file" -map_metadata 0 -c:a flac -compression_level 4 "$flac_file" 2>&1)
+        ffmpeg_status=$?
+
+        if [[ $ffmpeg_status -ne 0 ]]; then
             log "ERROR: ffmpeg conversion failed for: $audio_file"
+            log "FFMPEG ERROR: $ffmpeg_output"
             return 1
         fi
         
