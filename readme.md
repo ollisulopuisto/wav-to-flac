@@ -9,7 +9,7 @@ A robust Bash script for converting WAV and AIFF audio files to FLAC format with
 - Compares file sizes between original audio and FLAC formats
 - Optionally moves original audio files to trash if FLAC is smaller (saves disk space)
 - Includes detailed logging for tracking conversions
-- Dry run mode to simulate conversion without changing files
+- Dry run mode converts temporarily to measure savings, but never moves originals
 - Safely traverses directories with spaces in filenames
 
 ## Requirements
@@ -74,7 +74,8 @@ The script creates a log file at `$HOME/wav2flac_log.txt` with detailed informat
 
 ## Important Notes
 
-- In dry run mode, the script simulates the conversion process without creating or modifying any files. It provides estimates of space savings and logs the actions it *would* take.
+- Dry run mode still runs ffmpeg and creates an adjacent `.flac` file to measure actual space savings. It deletes that temporary output after a successful conversion and writes the log file. Existing FLAC files are kept. Original audio files are never moved in dry run mode.
+- Dry run therefore needs conversion time, write access, and enough free space for the FLAC output. A failed conversion or interruption can leave a partial output behind; check it before rerunning, because an existing FLAC is skipped rather than converted again.
 - The script searches for a trash directory named `#recycle` in the parent directories of the WAV files, and in `/volume1`, `/volume2`, `/volume1/backup`, and `/volume2/backup`. If no trash directory is found, a warning is logged, and the WAV file is not moved.
 
 ## License
