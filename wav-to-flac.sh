@@ -29,7 +29,6 @@ convert_audio_to_flac() {
     local audio_file="$1"
     local flac_file="${audio_file}.flac"
     local delete_flac=0
-    local format=$(echo "$audio_file" | grep -i -E '\.(wav|aif|aiff)$' | tr '[:upper:]' '[:lower:]')
     
     log "Processing: $audio_file"
     
