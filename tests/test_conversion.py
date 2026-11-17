@@ -12,6 +12,7 @@ import wave
 
 SCRIPT = Path(__file__).resolve().parents[1] / 'wav-to-flac.sh'
 FFMPEG = shutil.which('ffmpeg')
+BASH = os.environ.get('TEST_BASH', '/bin/bash')
 
 
 class ConversionTests(unittest.TestCase):
@@ -46,7 +47,7 @@ class ConversionTests(unittest.TestCase):
         return path
 
     def run_script(self, *flags):
-        return subprocess.run(['bash', str(SCRIPT), *flags, str(self.music)],
+        return subprocess.run([BASH, str(SCRIPT), *flags, str(self.music)],
                               env=self.env, text=True, capture_output=True, timeout=30)
 
     def install_slow_encoder(self):
@@ -80,7 +81,7 @@ os.execv(os.environ['REAL_FFMPEG'], [os.environ['REAL_FFMPEG'], *args])
                 files = [self.wav(f'{count}-{index}.wav') for index in range(count)]
                 state = Path(self.env['JOB_STATE'])
                 state.unlink(missing_ok=True)
-                process = subprocess.Popen(['bash', str(SCRIPT), '-n', str(self.music)],
+                process = subprocess.Popen([BASH, str(SCRIPT), '-n', str(self.music)],
                                            env=self.env, text=True, stdout=subprocess.PIPE,
                                            stderr=subprocess.STDOUT, start_new_session=True)
                 def cleanup(p=process):
@@ -199,7 +200,7 @@ from pathlib import Path
 Path(sys.argv[-1]).write_bytes(b'incomplete')
 time.sleep(20)
 """)
-        process = subprocess.Popen(['bash', str(SCRIPT), '-n', str(self.music)],
+        process = subprocess.Popen([BASH, str(SCRIPT), '-n', str(self.music)],
                                    env=self.env, stdout=subprocess.PIPE,
                                    stderr=subprocess.STDOUT, start_new_session=True)
         try:
