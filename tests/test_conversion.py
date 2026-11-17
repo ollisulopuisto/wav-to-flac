@@ -251,6 +251,93 @@ time.sleep(20)
             self.assertTrue(source.exists())
             self.assertFalse(Path(str(source) + '.flac').exists())
 
+    def without_ffprobe_env(self):
+        no_ffprobe_bin = self.root / 'no_ffprobe_bin'
+        no_ffprobe_bin.mkdir()
+        for p in os.environ['PATH'].split(os.pathsep):
+            if not p or not os.path.isdir(p):
+                continue
+            for item in os.listdir(p):
+                if item != 'ffprobe' and not (no_ffprobe_bin / item).exists():
+                    try:
+                        (no_ffprobe_bin / item).symlink_to(Path(p) / item)
+                    except OSError:
+                        pass
+        env = dict(self.env, PATH=str(self.bin) + os.pathsep + str(no_ffprobe_bin))
+        self.assertIsNone(shutil.which('ffprobe', path=env['PATH']))
+        return env
+
+    def test_conversion_succeeds_without_ffprobe(self):
+        source = self.wav()
+        result = subprocess.run([BASH, str(SCRIPT), '-n', str(self.music)],
+                                env=self.without_ffprobe_env(), text=True,
+                                capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(Path(str(source) + '.flac').exists())
+
+    def test_multichannel_layouts_match_ffprobe_conversion(self):
+        fallback_env = self.without_ffprobe_env()
+        for layout, channels in (('2.1', 3), ('3.0', 3), ('quad', 4),
+                                 ('4.0', 4), ('5.0', 5), ('6.1', 7),
+                                 ('5.0(side)', 5), ('5.1(side)', 6),
+                                 ('hexagonal', 6), ('octagonal', 8),
+                                 ('7.1', 8)):
+            for mode, env in (('ffprobe', self.env), ('fallback', fallback_env)):
+                with self.subTest(layout=layout, mode=mode):
+                    source = self.music / (layout + '-' + mode + '.wav')
+                    # Distinct channel values catch lost/reordered audio too.
+                    expression = '|'.join(str((i + 1) / 100) for i in range(channels))
+                    subprocess.run([FFMPEG, '-v', 'error', '-f', 'lavfi', '-i',
+                                    f'aevalsrc={expression}:s=8000:d=1:c={layout}',
+                                    '-c:a', 'pcm_s16le', str(source)], check=True)
+                    expected = json.loads(subprocess.check_output([
+                        'ffprobe', '-v', 'error', '-select_streams', 'a:0',
+                        '-show_entries', 'stream=sample_rate,channels', '-of', 'json',
+                        str(source)], text=True))['streams']
+                    self.assertEqual(expected, [{'sample_rate': '8000', 'channels': channels}])
+                    result = subprocess.run([BASH, str(SCRIPT), '-n', str(self.music)],
+                                            env=env, text=True, capture_output=True, timeout=30)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    output = Path(str(source) + '.flac')
+                    actual = json.loads(subprocess.check_output([
+                        'ffprobe', '-v', 'error', '-select_streams', 'a:0',
+                        '-show_entries', 'stream=sample_rate,channels', '-of', 'json',
+                        str(output)], text=True))['streams']
+                    self.assertEqual(actual, expected)
+                    self.assertTrue((self.music / '#recycle' / source.name).exists())
+                    self.assertFalse(source.exists())
+                    self.assertFalse(list(self.music.glob('*.tmp.*')))
+                    output.unlink()
+
+    def test_unknown_fallback_layout_keeps_original_and_removes_temp(self):
+        source = self.wav()
+        self.write_exe('ffmpeg', '#!/bin/sh\n"$REAL_FFMPEG" "$@" 2>&1 | sed "/Stream.*Audio:/s/mono/mystery-layout/g"\n')
+        result = subprocess.run([BASH, str(SCRIPT), '-n', str(self.music)],
+                                env=self.without_ffprobe_env(), text=True,
+                                capture_output=True, timeout=30)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(source.exists())
+        self.assertFalse(Path(str(source) + '.flac').exists())
+        self.assertFalse(list(self.music.glob('*.tmp.*')))
+        self.assertFalse((self.music / '#recycle' / source.name).exists())
+
+    def test_explicit_channel_count_without_ffprobe(self):
+        source = self.music / 'unnamed-layout.wav'
+        with wave.open(str(source), 'wb') as stream:
+            stream.setnchannels(3)
+            stream.setsampwidth(2)
+            stream.setframerate(11025)
+            stream.writeframes(bytes(3 * 2 * 11025))
+        result = subprocess.run([BASH, str(SCRIPT), '-n', str(self.music)],
+                                env=self.without_ffprobe_env(), text=True,
+                                capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        properties = subprocess.check_output([
+            'ffprobe', '-v', 'error', '-show_entries', 'stream=sample_rate,channels',
+            '-of', 'csv=p=0', str(source) + '.flac'], text=True)
+        self.assertEqual(properties.strip(), '11025,3')
+
+
 
 if __name__ == '__main__':
     unittest.main()

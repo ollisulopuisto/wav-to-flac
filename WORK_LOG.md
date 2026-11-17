@@ -11,3 +11,11 @@ CI is added for Linux and macOS without artifact or cache uploads. macOS Bash 3.
 Integration: merged current master, preserving its removal of the unused format variable (the follow-up converter already omits it). Revalidated all 13 tests, shell syntax and ShellCheck after conflict resolution.
 
 CI follow-up: macOS system-Bash tests passed. Current Linux ShellCheck treated the grouped pipeline exit as exiting main, flagging the real error branch as unreachable. Made the worker subshell explicit with parentheses; same worker ownership and failure propagation, all 13 tests still pass.
+
+# PR 4 multichannel fallback review follow-up, 2026-11-17
+
+The ffmpeg-only property reader now reads the installed ffmpeg's standard channel layout table and counts its channel decomposition. This covers named, numeric surround, and parenthesized layouts without another incomplete hard-coded list. Explicit channel counts remain supported. Only the first audio stream is inspected, matching ffprobe's a:0 selection; an unrecognized layout still fails closed.
+
+Failing-first validation: the parameterized real-conversion test failed on the unmodified PR head for nine layouts, including all six reported by Devin. It now checks 11 layouts through both ffprobe and isolated-PATH no-ffprobe conversions, with distinct channel samples, verifying published FLAC sample rate/channel count, trash placement, and temporary-file cleanup. An unnamed three-channel WAV checks explicit channel counts; an unrecognized-layout case checks original preservation and unpublished-temp cleanup.
+
+Local validation: all 17 unittest cases pass on Linux/ffmpeg 4.4.2; bash syntax and git diff whitespace checks pass. ShellCheck is unavailable locally, so its existing CI job remains required. macOS Bash 3.2 and a Synology NAS were not run locally. Fresh exact-head CI and a clean current-head Devin review remain merge gates.

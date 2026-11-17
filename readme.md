@@ -15,7 +15,7 @@ A robust Bash script for converting WAV and AIFF audio files to FLAC format with
 ## Requirements
 
 - Bash 3.2 or newer
-- ffmpeg and ffprobe (both must be installed and available in PATH)
+- ffmpeg (installed and available in PATH; ffprobe is optional, with ffmpeg stream descriptions and its channel-layout table used if absent)
 - Linux, macOS, or Synology DSM 7+
 
 ## Usage
