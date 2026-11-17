@@ -43,17 +43,24 @@ audio_properties() {
             -show_entries stream=sample_rate,channels -of csv=p=0 "$1" 2>/dev/null)
     fi
     if [[ -z "$props" ]]; then
-        props=$(ffmpeg -hide_banner -nostdin -i "$1" 2>&1 | awk '
+        # Use this ffmpeg build's layout table rather than a partial name list.
+        props=$({ ffmpeg -hide_banner -layouts 2>/dev/null
+                  ffmpeg -hide_banner -nostdin -i "$1" 2>&1
+                } | awk '
+            /^Standard channel layouts:/ { layouts=1; next }
+            layouts && NF==2 && $2 ~ /^[A-Z0-9]+(\+[A-Z0-9]+)*$/ {
+                counts[$1]=split($2, channels, /\+/)
+            }
             /Stream.*Audio:/ {
+                sr=ch=0;
                 for (i=1; i<=NF; i++) {
-                    if ($i ~ /^[0-9]+$/ && $(i+1) ~ /^Hz,?$/) sr=$i;
-                    if ($i=="mono," || $i=="mono") ch=1;
-                    else if ($i=="stereo," || $i=="stereo") ch=2;
-                    else if ($i ~ /^5\.1/) ch=6;
-                    else if ($i ~ /^7\.1/) ch=8;
-                    else if ($i ~ /^[0-9]+$/ && $(i+1) ~ /^channels?,?$/) ch=$i;
+                    token=$i; sub(/,$/, "", token);
+                    if (token ~ /^[0-9]+$/ && $(i+1) ~ /^Hz,?$/) sr=token;
+                    if (token in counts) ch=counts[token];
+                    else if (token ~ /^[0-9]+$/ && $(i+1) ~ /^channels?,?$/) ch=token;
                 }
-                if (sr && ch) { print sr "," ch; exit; }
+                if (sr && ch) print sr "," ch;
+                exit;
             }')
     fi
     [[ -n "$props" ]] && printf '%s\n' "$props"
