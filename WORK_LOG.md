@@ -9,3 +9,5 @@ Validation: 13 Python unittest cases pass using generated WAV/AIFF audio, real f
 CI is added for Linux and macOS without artifact or cache uploads. macOS Bash 3.2 and a real Synology NAS were not tested locally. No real music library or existing recycle bin was touched. The original speedup claim is withdrawn: strict verification adds decoding work, and no new wall-clock benchmark was run. Exact-head CI and a fresh clean Devin review remain merge gates.
 
 Integration: merged current master, preserving its removal of the unused format variable (the follow-up converter already omits it). Revalidated all 13 tests, shell syntax and ShellCheck after conflict resolution.
+
+CI follow-up: macOS system-Bash tests passed. Current Linux ShellCheck treated the grouped pipeline exit as exiting main, flagging the real error branch as unreachable. Made the worker subshell explicit with parentheses; same worker ownership and failure propagation, all 13 tests still pass.

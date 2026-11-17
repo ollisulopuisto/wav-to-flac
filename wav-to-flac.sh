@@ -266,7 +266,7 @@ main() {
         # The loop and both batch waits share the worker-owning subshell.
         # Bounded batches intentionally keep compatibility with macOS Bash 3.2.
         if ! find "$base_dir" -type d -name '#recycle' -prune -o -type f \
-            \( -iname "*.wav" -o -iname "*.aif" -o -iname "*.aiff" \) -print0 | {
+            \( -iname "*.wav" -o -iname "*.aif" -o -iname "*.aiff" \) -print0 | (
             count=0
             failed=0
             pids=()
@@ -282,7 +282,7 @@ main() {
             done
             for pid in "${pids[@]}"; do wait "$pid" || failed=1; done
             exit "$failed"
-        }; then
+        ); then
             log "ERROR: Conversion process failed; check per-file errors"
             return 1
         fi
