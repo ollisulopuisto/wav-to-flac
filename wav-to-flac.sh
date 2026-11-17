@@ -206,14 +206,37 @@ main() {
     log "Found $total_files audio files to process"
     
     if [ "$total_files" -gt 0 ]; then
-        # Process files one by one using find's -exec
-        local count=0
-        find "$base_dir" \( -iname "*.wav" -o -iname "*.aif" -o -iname "*.aiff" \) -print0 | 
+        # ffmpeg conversions are CPU-bound and independent per file, so process
+        # them in bounded parallel batches to saturate available CPUs instead of
+        # converting one file at a time.
+        local max_jobs
+        if command -v nproc >/dev/null 2>&1; then
+            max_jobs=$(nproc)
+        elif command -v sysctl >/dev/null 2>&1; then
+            max_jobs=$(sysctl -n hw.ncpu 2>/dev/null || echo 4)
+        else
+            max_jobs=4
+        fi
+        (( max_jobs < 1 )) && max_jobs=1
+
+        # Export functions so background jobs can invoke them in child processes
+        export -f log convert_audio_to_flac move_to_trash
+
+        # Process files one batch at a time; wait() has no -n flag on bash 3.x
+        local count=0 running=0
+        find "$base_dir" \( -iname "*.wav" -o -iname "*.aif" -o -iname "*.aiff" \) -print0 |
         while IFS= read -r -d $'\0' audio_file; do
             ((count++))
             log "[$count/$total_files] Processing file"
-            convert_audio_to_flac "$audio_file"
+            convert_audio_to_flac "$audio_file" &
+            ((running++))
+            if (( running >= max_jobs )); then
+                wait
+                running=0
+            fi
         done
+        # Wait for the final partial batch
+        wait
     else
         log "No WAV files found to process."
     fi
