@@ -14,8 +14,8 @@ A robust Bash script for converting WAV and AIFF audio files to FLAC format with
 
 ## Requirements
 
-- Bash shell
-- ffmpeg (must be installed and available in PATH)
+- Bash 3.2 or newer
+- ffmpeg and ffprobe (both must be installed and available in PATH)
 - Linux, macOS, or Synology DSM 7+
 
 ## Usage
@@ -30,7 +30,9 @@ If no directory is specified, the current directory is used.
 
 ### Options
 
-- `-n`: Disable dry-run mode (will actually move WAV files to trash if FLAC is smaller)
+- `-n`: Disable dry-run mode (move original audio to trash only after verifying a smaller FLAC).
+- `-j N`: Use 1 to 8 workers. The default is two, or one when only one CPU is available. Each encoder uses one thread.
+- `-h`: Show help.
 
 ### Examples
 
@@ -74,9 +76,17 @@ The script creates a log file at `$HOME/wav2flac_log.txt` with detailed informat
 
 ## Important Notes
 
-- Dry run mode still runs ffmpeg and creates an adjacent `.flac` file to measure actual space savings. It deletes that temporary output after a successful conversion and writes the log file. Existing FLAC files are kept. Original audio files are never moved in dry run mode.
-- Dry run therefore needs conversion time, write access, and enough free space for the FLAC output. A failed conversion or interruption can leave a partial output behind; check it before rerunning, because an existing FLAC is skipped rather than converted again.
-- The script searches for a trash directory named `#recycle` in the parent directories of the WAV files, and in `/volume1`, `/volume2`, `/volume1/backup`, and `/volume2/backup`. If no trash directory is found, a warning is logged, and the WAV file is not moved.
+- Dry run creates a unique adjacent temporary file, verifies it, measures savings, and removes it. It never publishes a new final FLAC or moves an original. Existing FLAC files remain untouched.
+- New output is written to an adjacent temporary file and published with a same-filesystem rename only after verification. Failure or a caught interruption removes the unpublished temporary file. An uncatchable power loss or SIGKILL can leave `.flac.tmp.*` files; these are never accepted as finished output on reruns.
+- Before moving any original, the script checks the FLAC signature, strictly decodes both files, and compares decoded PCM SHA-256 hashes plus sample rate and channel count. A truncated or different existing FLAC produces an error and leaves the original in place. Formats that cannot round-trip losslessly are refused rather than discarded.
+- Original timestamps are applied to new output. Originals are moved only when the verified FLAC is smaller. A collision in the recycle bin is an error; nothing is overwritten.
+- The traversal excludes `#recycle` directories. The script searches ancestors and known Synology volume roots for a recycle bin; a missing bin is an error for a real run that needs to move a file.
+- All launched conversions finish before the command reports completion. Any failed conversion makes the command return nonzero, after waiting for its other workers. Per-file log lines include their source path. Batches intentionally wait for their slowest worker for Bash 3.2 compatibility; this is not a work-stealing pool.
+- Verification reads both decoded streams and adds work. No wall-clock speedup is claimed for this safety fix.
+
+## Tests
+
+Run `bash -n wav-to-flac.sh`, `shellcheck wav-to-flac.sh`, and `python3 -m unittest discover -s tests -v` with ffmpeg/ffprobe available. Tests use generated audio and temporary recycle directories, not a real music library. They cover one-file, exact-batch and partial-batch completion; failed/truncated/wrong audio; dry runs; timestamps; cleanup on SIGTERM; bounds; and recycle collisions. CI runs the suite on Linux and macOS, whose `/bin/bash` exercises the Bash 3.2 path.
 
 ## License
 
