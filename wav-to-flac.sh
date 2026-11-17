@@ -36,6 +36,29 @@ audio_hash() {
         -i "$1" -map 0:a:0 -c:a pcm_s32le -f hash -hash sha256 -
 }
 
+audio_properties() {
+    local props=""
+    if command -v ffprobe >/dev/null 2>&1; then
+        props=$(ffprobe -v error -select_streams a:0 \
+            -show_entries stream=sample_rate,channels -of csv=p=0 "$1" 2>/dev/null)
+    fi
+    if [[ -z "$props" ]]; then
+        props=$(ffmpeg -hide_banner -nostdin -i "$1" 2>&1 | awk '
+            /Stream.*Audio:/ {
+                for (i=1; i<=NF; i++) {
+                    if ($i ~ /^[0-9]+$/ && $(i+1) ~ /^Hz,?$/) sr=$i;
+                    if ($i=="mono," || $i=="mono") ch=1;
+                    else if ($i=="stereo," || $i=="stereo") ch=2;
+                    else if ($i ~ /^5\.1/) ch=6;
+                    else if ($i ~ /^7\.1/) ch=8;
+                    else if ($i ~ /^[0-9]+$/ && $(i+1) ~ /^channels?,?$/) ch=$i;
+                }
+                if (sr && ch) { print sr "," ch; exit; }
+            }')
+    fi
+    [[ -n "$props" ]] && printf '%s\n' "$props"
+}
+
 convert_audio_to_flac() (
     local audio_file="$1"
     local LOG_CONTEXT="$audio_file"
@@ -74,10 +97,8 @@ convert_audio_to_flac() (
         return 1
     fi
     local source_properties converted_properties
-    source_properties=$(ffprobe -v error -select_streams a:0 \
-        -show_entries stream=sample_rate,channels -of csv=p=0 "$audio_file") || return 1
-    converted_properties=$(ffprobe -v error -select_streams a:0 \
-        -show_entries stream=sample_rate,channels -of csv=p=0 "$candidate") || return 1
+    source_properties=$(audio_properties "$audio_file") || return 1
+    converted_properties=$(audio_properties "$candidate") || return 1
     if [[ -z "$source_properties" || "$source_properties" != "$converted_properties" ]]; then
         log "ERROR: FLAC stream properties differ: $audio_file"
         return 1
@@ -218,12 +239,10 @@ main() {
         return 1
     fi
     
-    for tool in ffmpeg ffprobe; do
-        if ! command -v "$tool" >/dev/null 2>&1; then
-            echo "ERROR: Required command not found: $tool" >&2
-            return 1
-        fi
-    done
+    if ! command -v ffmpeg >/dev/null 2>&1; then
+        echo "ERROR: Required command not found: ffmpeg" >&2
+        return 1
+    fi
     # Set base directory (default to current directory)
     local base_dir="${1:-.}"
     

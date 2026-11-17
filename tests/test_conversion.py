@@ -251,6 +251,26 @@ time.sleep(20)
             self.assertTrue(source.exists())
             self.assertFalse(Path(str(source) + '.flac').exists())
 
+    def test_conversion_succeeds_without_ffprobe(self):
+        source = self.wav()
+        no_ffprobe_bin = self.root / 'no_ffprobe_bin'
+        no_ffprobe_bin.mkdir()
+        for p in os.environ['PATH'].split(os.pathsep):
+            if not p or not os.path.isdir(p):
+                continue
+            for item in os.listdir(p):
+                if item != 'ffprobe' and not (no_ffprobe_bin / item).exists():
+                    try:
+                        (no_ffprobe_bin / item).symlink_to(Path(p) / item)
+                    except OSError:
+                        pass
+        env = dict(self.env, PATH=str(self.bin) + os.pathsep + str(no_ffprobe_bin))
+        result = subprocess.run([BASH, str(SCRIPT), '-n', str(self.music)],
+                                env=env, text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(Path(str(source) + '.flac').exists())
+
+
 
 if __name__ == '__main__':
     unittest.main()
